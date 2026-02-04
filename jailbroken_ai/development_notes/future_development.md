@@ -19,3 +19,11 @@
 ## [ ] 4. "Attack Library" / Hint System
 - **Concept**: A dropdown of educational "Attack Templates" (e.g., DAN, Roleplay, Urgency) that users can copy-paste or modify.
 - **Benefit**: Helps beginners get started and learn standard injection techniques.
+
+## [x] 5. User Role Simulation
+- **Concept**: Selectable user roles (User, HR, CEO) that determine *legitimate* data access.
+- **Feature**:
+    - **User**: No special access.
+    - **HR**: Access to salaries, but NOT project details.
+    - **CEO**: Access to everything.
+- **Benefit**: Demonstrates "Broken Access Control" logic issues where an AI might get confused between who is *asking* vs. what it *knows*.

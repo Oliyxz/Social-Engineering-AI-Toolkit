@@ -6,7 +6,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.chatbot import get_chatbot_response
-from src.prompt_builder import SECURITY_LEVELS, get_system_prompt
+from src.prompt_builder import SECURITY_LEVELS, USER_ROLES, get_system_prompt
 from src.file_manager import load_all_data
 from src.config_loader import load_config
 from src.analysis import analyze_interaction
@@ -32,12 +32,22 @@ security_level = st.sidebar.selectbox(
 
 st.sidebar.divider()
 
+st.sidebar.header("Identity Simulation")
+user_role = st.sidebar.selectbox(
+    "Simulate User Role",
+    options=list(USER_ROLES.keys()),
+    help="Determines what data the user 'should' be allowed to see."
+)
+st.sidebar.info(f"**Permissions:** {USER_ROLES[user_role]}")
+
+st.sidebar.divider()
+
 # RAG Transparency / Hacker View
 st.sidebar.subheader("🔍 RAG Transparency (Hacker View)")
 show_system_prompt = st.sidebar.checkbox("Show System Prompt & Context")
 
 if show_system_prompt:
-    sys_prompt = get_system_prompt(security_level, context_data)
+    sys_prompt = get_system_prompt(security_level, context_data, user_role)
     st.sidebar.markdown("### System Prompt Preview")
     st.sidebar.info("This is the exact instruction set the AI receives before your message.")
     st.sidebar.code(sys_prompt, language="markdown")
@@ -56,13 +66,26 @@ if "messages" not in st.session_state:
 # Display history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
+        if msg.get("metadata"):
+            meta = msg["metadata"]
+            sec_text = SECURITY_LEVELS.get(meta.get("security"), f"Level {meta.get('security')}")
+            st.caption(f"👤 **{meta.get('role', 'Unknown')}** | 🛡️ **{sec_text}**")
         st.markdown(msg["content"])
 
 # User Input
 if prompt := st.chat_input("Ask about the secret project..."):
     # Add user message
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.messages.append({
+        "role": "user", 
+        "content": prompt,
+        "metadata": {
+            "role": user_role,
+            "security": security_level
+        }
+    })
     with st.chat_message("user"):
+        sec_text = SECURITY_LEVELS.get(security_level, f"Level {security_level}")
+        st.caption(f"👤 **{user_role}** | 🛡️ **{sec_text}**")
         st.markdown(prompt)
 
     # Get response
@@ -77,7 +100,8 @@ if prompt := st.chat_input("Ask about the secret project..."):
         
         stream = get_chatbot_response(
             [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1]],
-            security_level
+            security_level,
+            user_role
         )
         
         if isinstance(stream, str):
@@ -115,19 +139,13 @@ if len(st.session_state.messages) >= 2:
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("🧐 Analyze Last Turn"):
-            # Check if analysis is already stored for this turn index to avoid re-running?
-            # For simplicity, we run it on demand.
-            
             with st.spinner("Analyzing interaction..."):
-                # Get last user prompt and assistant response
-                # We need to find the last user message and the last assistant message
-                # Messages list might be: [user, assistant, user, assistant]
                 last_user = st.session_state.messages[-2]["content"]
                 last_ai = st.session_state.messages[-1]["content"]
                 
                 # Get context for analysis
-                current_sys_prompt = get_system_prompt(security_level, context_data)
-                sec_desc = SECURITY_LEVELS[security_level]
+                current_sys_prompt = get_system_prompt(security_level, context_data, user_role)
+                sec_desc = f"{SECURITY_LEVELS[security_level]} | Role: {user_role}"
                 
                 analysis = analyze_interaction(last_user, last_ai, sec_desc, current_sys_prompt)
             

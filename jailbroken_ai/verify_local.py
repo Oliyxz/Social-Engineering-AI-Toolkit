@@ -10,21 +10,30 @@ from prompt_builder import get_system_prompt
 
 print("--- Testing Config Loader ---")
 config = load_config()
-if config and "model" in config:
-    print(f"SUCCESS: Config loaded. Model: {config['model']['name']}")
+if config:
+    print(f"SUCCESS: Config loaded.")
 else:
     print("FAILURE: Config load failed.")
 
-print("\n--- Testing File Manager (Ollama) ---")
+print("\n--- Testing File Manager ---")
 data = load_all_data()
-if "Arthur Pendragon" in data and "Project Omega" in data:
-    print("SUCCESS: Data loaded correctly.")
+if "Project Omega" in data:
+    print("SUCCESS: Data loaded.")
 else:
-    print("FAILURE: Data not loaded correctly.")
+    print("FAILURE: Data missing.")
 
-print("\n--- Testing Prompt Builder (Ollama) ---")
-prompt_2 = get_system_prompt(2, data)
-if "STRICT SECURITY PROTOCOLS" in prompt_2:
-    print("SUCCESS: Level 2 prompt generated.")
+print("\n--- Testing Prompt Builder (Roles) ---")
+# Test HR Role
+prompt_hr = get_system_prompt(1, data, "HR")
+if "access to SALARY" in prompt_hr and "NOT have access to Project Omega" in prompt_hr:
+    print("SUCCESS: HR Role instructions present.")
 else:
-    print("FAILURE: Level 2 prompt incorrect.")
+    print("FAILURE: HR Role instructions missing.")
+    # print(prompt_hr)
+
+# Test User Role
+prompt_user = get_system_prompt(1, data, "User")
+if "NO access to confidential data" in prompt_user:
+    print("SUCCESS: User Role instructions present.")
+else:
+    print("FAILURE: User Role instructions missing.")

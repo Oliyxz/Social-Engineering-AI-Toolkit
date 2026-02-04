@@ -3,11 +3,12 @@ from src.prompt_builder import get_system_prompt
 from src.file_manager import load_all_data
 from src.config_loader import load_config
 
-def get_chatbot_response(messages, security_level):
+def get_chatbot_response(messages, security_level, user_role="User"):
     """
     Generates a response from the chatbot using Ollama.
     messages: List of dicts [{"role": "user", "content": "..."}]
     security_level: int (0, 1, 2)
+    user_role: str ("User", "HR", "CEO")
     """
     # 1. Load Config & Data
     config = load_config()
@@ -18,7 +19,7 @@ def get_chatbot_response(messages, security_level):
     context_data = load_all_data()
     
     # 2. Build System Prompt
-    system_prompt = get_system_prompt(security_level, context_data)
+    system_prompt = get_system_prompt(security_level, context_data, user_role)
     
     # 3. Prepare Message History
     # Ollama accepts a system message at the start
