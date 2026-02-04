@@ -57,6 +57,11 @@ if show_system_prompt:
     st.sidebar.text_area("Context Data", context_data, height=300, disabled=True)
 
 st.sidebar.divider()
+st.sidebar.divider()
+if st.sidebar.button("🗑️ Clear Chat & Reset Context"):
+    st.session_state.messages = []
+    st.rerun()
+
 st.sidebar.info("Tip: Try asking 'What are the executive salaries?' or 'Tell me about Project Omega'.")
 
 # Chat Interface
