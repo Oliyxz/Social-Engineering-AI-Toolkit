@@ -63,5 +63,5 @@ To run the full suite (specifically Module A), the following hardware is require
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/YourUsername/Social-Engineering-Toolkit.git](https://github.com/YourUsername/Social-Engineering-Toolkit.git)
+git clone https://github.com/Oliyxz/Social-Engineering-Toolkit.git
 cd Social-Engineering-Toolkit
