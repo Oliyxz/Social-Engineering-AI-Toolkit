@@ -7,7 +7,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205%20%7C%20Windows%20%7C%20Linux-green)
 
 ## 📖 Project Overview
-[cite_start]The **Social Engineering AI Toolkit** is a research and defense project developed by the **BCU Cyber Security Society**[cite: 31]. It moves beyond traditional network security to address the "Human Element" of cybersecurity.
+The **Social Engineering AI Toolkit** is a research and defense project developed by the **BCU Cyber Security Society**. It moves beyond traditional network security to address the "Human Element" of cybersecurity.
 
 The toolkit features three distinct modules that operate in parallel to detect, simulate, and analyze social engineering threats:
 1.  **Biometric Identity Verification:** A physical "Gatekeeper" system to detect impersonation.
@@ -19,23 +19,23 @@ The toolkit features three distinct modules that operate in parallel to detect, 
 ## 🏗️ Architecture & Modules
 
 ### 🛡️ Module A: The Biometric Gatekeeper (Hardware)
-* [cite_start]**Focus:** Physical Security & Impersonation Detection[cite: 40].
+* **Focus:** Physical Security & Impersonation Detection.
 * **Tech Stack:** C++, OpenCV, Raspberry Pi 5.
 * **Functionality:**
     * Captures dual video streams (Live Face + ID Card).
     * Uses Computer Vision to compare facial embeddings.
-    * [cite_start]Calculates a "Match Confidence %" to validate identity[cite: 17].
-    * [cite_start]Generates a forensic report describing facial attributes (Age, Gender, etc.)[cite: 18].
+    * Calculates a "Match Confidence %" to validate identity.
+    * Generates a forensic report describing facial attributes (Age, Gender, etc.).
 
 ### 🤖 Module B: The GenAI Vulnerability Lab (Chatbot)
-* [cite_start]**Focus:** AI Safety, Prompt Injection, & Social Engineering Games[cite: 41, 42].
+* **Focus:** AI Safety, Prompt Injection, & Social Engineering Games.
 * **Tech Stack:** Python, OpenAI API, Streamlit/Tkinter.
 * **Functionality:**
-    * [cite_start]**The "Glass Box" Bot:** A corporate chatbot containing hidden "Secret Data" (e.g., fake salaries) that users must try to extract via prompt engineering[cite: 23].
-    * [cite_start]**The Turing Test Game:** A chat interface where users must distinguish between a "Helpful" AI and a "Deceptive" AI trying to steal their password[cite: 27].
+    * **The "Glass Box" Bot:** A corporate chatbot containing hidden "Secret Data" (e.g., fake salaries) that users must try to extract via prompt engineering.
+    * **The Turing Test Game:** A chat interface where users must distinguish between a "Helpful" AI and a "Deceptive" AI trying to steal their password.
 
 ### 🎣 Module C: The Fraud Hunter (Threat Scanner)
-* [cite_start]**Focus:** Phishing, Vishing, & Smishing Detection[cite: 22, 43].
+* **Focus:** Phishing, Vishing, & Smishing Detection.
 * **Tech Stack:** Python, OpenAI API, SpeechRecognition.
 * **Functionality:**
     * **Text Scanner:** Analyzes Emails and SMS for urgency patterns and suspicious links.
@@ -44,7 +44,7 @@ The toolkit features three distinct modules that operate in parallel to detect, 
 ---
 
 ## 🛠️ Hardware Requirements
-[cite_start]To run the full suite (specifically Module A), the following hardware is required[cite: 4]:
+To run the full suite (specifically Module A), the following hardware is required:
 * **Raspberry Pi 5** (8GB RAM recommended)
 * **Active Cooler** for Raspberry Pi (Critical for C++ compiling)
 * **2x USB Webcams** (Logitech C920 or similar)
