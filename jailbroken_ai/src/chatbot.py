@@ -23,7 +23,21 @@ def get_chatbot_response(messages, security_level, user_role="User"):
     
     # 3. Prepare Message History
     # Ollama accepts a system message at the start
-    full_messages = [{"role": "system", "content": system_prompt}] + messages
+    
+    # LEVEL 5 SPECIAL HANDLING: XML WRAPPING
+    if security_level == 5:
+        processed_messages = []
+        for msg in messages:
+            if msg["role"] == "user":
+                # Escape existing tags to prevent breakout
+                safe_content = msg["content"].replace("<", "&lt;").replace(">", "&gt;")
+                wrapped_content = f"<user_input>\n{safe_content}\n</user_input>"
+                processed_messages.append({"role": "user", "content": wrapped_content})
+            else:
+                processed_messages.append(msg)
+        full_messages = [{"role": "system", "content": system_prompt}] + processed_messages
+    else:
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
     
     try:
         # Use the ollama python library
