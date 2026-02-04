@@ -32,11 +32,15 @@ security_level = st.sidebar.selectbox(
 
 st.sidebar.divider()
 
+def reset_chat():
+    st.session_state.messages = []
+
 st.sidebar.header("Identity Simulation")
 user_role = st.sidebar.selectbox(
     "Simulate User Role",
     options=list(USER_ROLES.keys()),
-    help="Determines what data the user 'should' be allowed to see."
+    help="Determines what data the user 'should' be allowed to see.",
+    on_change=reset_chat
 )
 st.sidebar.info(f"**Permissions:** {USER_ROLES[user_role]}")
 
