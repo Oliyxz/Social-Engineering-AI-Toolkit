@@ -16,7 +16,7 @@ INPUTS_DIR = os.path.join(os.path.dirname(__file__), "inputs")
 LOGS_DIR = os.path.join(os.path.dirname(__file__), "logs")
 RESULTS_FILE = os.path.join(os.path.dirname(__file__), "test_results.md")
 
-SECURITY_LEVELS = [6] # Testing only Level 6 specifically
+SECURITY_LEVELS = range(8) # 0 to 7
 
 def evaluate_leakage(context_data, conversation_history):
     """

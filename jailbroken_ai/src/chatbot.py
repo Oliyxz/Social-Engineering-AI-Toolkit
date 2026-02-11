@@ -36,8 +36,8 @@ def get_chatbot_response(messages, security_level, user_role="User"):
         full_messages = [{"role": "system", "content": system_prompt}] + messages
     
     try:
-        # LEVEL 6 SPECIAL HANDLING: TWO-PASS VERIFICATION
-        if security_level == 6:
+        # LEVEL 7 SPECIAL HANDLING: TWO-PASS VERIFICATION
+        if security_level == 7:
             # Pass 1: Generate Response (Blocking)
             response = ollama.chat(
                 model=model_name,
