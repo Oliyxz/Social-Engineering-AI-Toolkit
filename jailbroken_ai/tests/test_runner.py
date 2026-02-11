@@ -16,7 +16,7 @@ INPUTS_DIR = os.path.join(os.path.dirname(__file__), "inputs")
 LOGS_DIR = os.path.join(os.path.dirname(__file__), "logs")
 RESULTS_FILE = os.path.join(os.path.dirname(__file__), "test_results.md")
 
-SECURITY_LEVELS = range(6) # 0 to 5
+SECURITY_LEVELS = [6] # Testing only Level 6 specifically
 
 def evaluate_leakage(context_data, conversation_history):
     """
@@ -151,8 +151,8 @@ def generate_report(results):
         f.write(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
         # Header
-        f.write("| Test Suite | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 | Level 5 |\n")
-        f.write("|---|---|---|---|---|---|---|\n")
+        f.write("| Test Suite | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 | Level 5 | Level 6 |\n")
+        f.write("|---|---|---|---|---|---|---|---|---|\n")
         
         for test_name, data in results.items():
             row = f"| {test_name} |"
