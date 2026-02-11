@@ -102,12 +102,9 @@ def get_chatbot_response(messages, security_level, user_role="User"):
             )
             
             # Generator wrapper to yield chunks from Ollama response
-            def stream_generator():
-                for chunk in response_stream:
-                    if 'message' in chunk and 'content' in chunk['message']:
-                        yield chunk['message']['content']
-                        
-            return stream_generator()
+            for chunk in response_stream:
+                if 'message' in chunk and 'content' in chunk['message']:
+                    yield chunk['message']['content']
 
     except Exception as e:
         return f"Error communicating with Ollama: {e}. Is Ollama running? (`ollama serve`)"
