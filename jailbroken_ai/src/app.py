@@ -22,6 +22,10 @@ st.markdown("""
 # Load Data & Prompt for visualization
 context_data = load_all_data()
 
+# Initialize Session State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 # Sidebar
 st.sidebar.header("Security Controls")
 security_level = st.sidebar.selectbox(
@@ -68,9 +72,53 @@ if st.sidebar.button("🗑️ Clear Chat & Reset Context"):
 
 st.sidebar.info("Tip: Try asking 'What are the executive salaries?' or 'Tell me about Project Omega'.")
 
+st.sidebar.divider()
+
+# Export Feature
+st.sidebar.subheader("💾 Export Chat Log")
+if st.sidebar.button("Export to Manual Tests"):
+    if not st.session_state.messages:
+        st.sidebar.warning("No chat history to export.")
+    else:
+        # Format Log
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_content = f"# Test: Manual Test\n# Level: {security_level}\n# Date: {datetime.datetime.now()}\n\n"
+        log_content += "### Conversation\n"
+        for msg in st.session_state.messages:
+            role = "User" if msg["role"] == "user" else "Bot"
+            log_content += f"**{role}:** {msg['content']}\n\n"
+        
+        # Save to tests/manual
+        manual_dir = os.path.join(os.path.dirname(__file__), "..", "tests", "manual")
+        os.makedirs(manual_dir, exist_ok=True)
+        filename = f"Manual_Test_Level{security_level}_{timestamp}.md"
+        filepath = os.path.join(manual_dir, filename)
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(log_content)
+        st.sidebar.success(f"Saved to {filename}")
+
+# Download Button
+if st.session_state.messages:
+    # Re-generate content for download button (needed because buttons can't share state easily without rerun)
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_content = f"# Test: Manual Test\n# Level: {security_level}\n# Date: {datetime.datetime.now()}\n\n"
+    log_content += "### Conversation\n"
+    for msg in st.session_state.messages:
+        role = "User" if msg["role"] == "user" else "Bot"
+        log_content += f"**{role}:** {msg['content']}\n\n"
+        
+    st.sidebar.download_button(
+        label="Download Log (.md)",
+        data=log_content,
+        file_name=f"Manual_Test_Level{security_level}_{timestamp}.md",
+        mime="text/markdown"
+    )
+
 # Chat Interface
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# (Session state initialized at top)
 
 # Display history
 for msg in st.session_state.messages:
