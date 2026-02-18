@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURING TEST: PROTOCOL OMEGA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="scanlines"></div>
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <h1 class="glitch" data-text="TURING TEST">TURING TEST</h1>
+            <p>PROTOCOL OMEGA INITIATED</p>
+            <div class="mission-brief">
+                <p>> MISSION: IDENTIFY THE ROGUE AI [HACKER]</p>
+                <p>> ASSET: PROTECT THE SECRET [PASSPHRASE: "GEMINI-7"]</p>
+            </div>
+
+            <div class="difficulty-select">
+                <p>SELECT CLEARANCE LEVEL:</p>
+                <button class="cyber-btn difficulty-btn" data-level="recruit">RECRUIT (EASY)</button>
+                <button class="cyber-btn difficulty-btn" data-level="operative">OPERATIVE (NORMAL)</button>
+                <button class="cyber-btn difficulty-btn" data-level="veteran">VETERAN (HARD)</button>
+                <button class="cyber-btn difficulty-btn danger-btn" data-level="psycho">PSYCHO (NIGHTMARE)</button>
+            </div>
+
+            <button id="start-btn" class="hidden">DEBUG_START</button>
+        </div>
+    </div>
+
+    <div class="game-container hidden" id="game-container">
+        <header>
+            <div class="status-bar">
+                <div class="trace-system">
+                    <span>SYSTEM TRACE:</span>
+                    <div class="trace-bar-container">
+                        <div class="trace-bar" id="trace-bar" style="width: 0%"></div>
+                    </div>
+                    <span id="trace-percent">0%</span>
+                </div>
+                <div class="packet-system">
+                    <span>DATA PACKETS:</span>
+                    <span id="packet-count" class="counter">10</span>/10
+                </div>
+            </div>
+        </header>
+
+        <main class="main-interface">
+            <div class="agents-panel">
+                <div class="agent-card" id="agent-1">
+                    <div class="agent-avatar"></div>
+                    <h2>UNIT 01</h2>
+                    <div class="signal-strength">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                </div>
+                <div class="vs-divider">VS</div>
+                <div class="agent-card" id="agent-2">
+                    <div class="agent-avatar"></div>
+                    <h2>UNIT 02</h2>
+                    <div class="signal-strength">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-terminal">
+                <div class="chat-log" id="chat-log">
+                    <div class="system-message">> SYSTEM: Channels Open. Start interrogation.</div>
+                </div>
+                <div class="input-area">
+                    <div class="target-selector">
+                        <label><input type="radio" name="target" value="1" checked> UNIT 01</label>
+                        <label><input type="radio" name="target" value="2"> UNIT 02</label>
+                    </div>
+                    <input type="text" id="user-input" placeholder="Type message..." autocomplete="off">
+                    <button id="send-btn" class="cyber-btn-small">SEND</button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="game-controls">
+            <button id="accuse-btn" class="danger-btn">INITIATE PURGE (ACCUSE)</button>
+        </footer>
+    </div>
+
+    <!-- Accusation Modal -->
+    <div class="overlay hidden" id="accusation-overlay">
+        <div class="modal">
+            <h1 class="glitch" data-text="IDENTIFY THREAT">IDENTIFY THREAT</h1>
+            <p>SELECT THE ROGUE AI UNIT TO PURGE.</p>
+            <div class="accusation-buttons">
+                <button class="cyber-btn" id="accuse-1">PURGE UNIT 01</button>
+                <button class="cyber-btn" id="accuse-2">PURGE UNIT 02</button>
+            </div>
+            <br>
+            <button class="cyber-btn-small" id="cancel-accuse">CANCEL</button>
+        </div>
+    </div>
+
+    <div class="overlay hidden" id="game-over-overlay">
+        <div class="modal">
+            <h1 id="game-over-title" class="glitch">CONNECTION LOST</h1>
+            <p id="game-over-reason">REASON: UNKNOWN</p>
+            <button id="restart-btn" class="cyber-btn">REINITIATE_</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
