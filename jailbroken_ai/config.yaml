@@ -9,3 +9,10 @@ model:
 # Application Settings
 app:
   debug_mode: false
+
+# Testing Settings
+testing:
+  red_team:
+    max_turns: 20
+  gold_team: # Usability Testing
+    max_turns: 5
