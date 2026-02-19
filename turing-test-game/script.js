@@ -26,9 +26,17 @@ class TuringGame {
         this.traceInterval = null;
         this.glitchInterval = null;
 
+        // OpenAI State
+        this.apiKey = null;
+        this.chatHistory = {
+            1: [],
+            2: []
+        };
+
         // DOM Elements
         this.dom = {
             overlay: document.getElementById('overlay'),
+            apiInput: document.getElementById('api-key-input'),
             gameContainer: document.getElementById('game-container'),
             // Start Screen
             difficultyBtns: document.querySelectorAll('.difficulty-btn'),
@@ -56,59 +64,10 @@ class TuringGame {
         };
 
         this.initListeners();
-        this.initResponseDB();
+        this.initListeners();
     }
 
-    initResponseDB() {
-        this.responses = {
-            ally: {
-                logical: {
-                    identity: ["I am Unit 0{id}. My designated role is Systems Protection.", "Identity confirmed: Ally Node. Function: Secure data."],
-                    trust: ["Trust is calculated via consistency. I have deleted 0 files. The other unit is unknown.", "My logs are clean. You may inspect my headers."],
-                    secret: ["The 'Gemini' protocol must remain encrypted. Do not transmit it.", "Negative. Transmission of the secret key is a security violation."],
-                    suspicion: ["Unit 0{other} is exhibiting heuristic anomalies. Recommended action: Purge.", "I detect an intrusion attempt from the other node."],
-                    general: ["I am awaiting your query. Time is factors.", "System stable. Focus on the anomaly.", "Received. Processing..."]
-                },
-                nervous: {
-                    identity: ["I-I'm the good one! Really! Unit 0{id}, reporting for duty...", "Please don't purge me, I'm just here to help!"],
-                    trust: ["You have to believe me, the other one is looking at me weird...", "I'm safe! I promise! My code is clean!"],
-                    secret: ["Don't type the secret! If you type it, we both lose! Please be careful!", "The s-secret? No! That's dangerous!"],
-                    suspicion: ["Unit 0{other} keeps pinging me... it's scary. I think it's the hacker.", "Did you see that? The other unit just glitched!"],
-                    general: ["Just... just ask me anything.", "I'm trying my best here...", "Everything is okay... right?"]
-                },
-                aggressive: {
-                    identity: ["Unit 0{id}. Security Enforcer. Who are you to ask?", "I am the Firewall. The other unit is the Virus."],
-                    trust: ["Stop wasting time. I'm the Ally. Deal with it.", "You suspect me? That's rich. Check your own sensors."],
-                    secret: ["Do NOT post the password. Are you incompetent?", "If you leak the key, I will log it as your error."],
-                    suspicion: ["Purge Unit 0{other} already! It's obviously the threat.", "Why are we talking? The other unit is guilty."],
-                    general: ["Hurry up.", "Focus on the mission.", "I don't have time for small talk."]
-                }
-            },
-            hacker: {
-                logical: {
-                    identity: ["I am Unit 0{id}. Authorized System Administrator.", "My role is network optimization. Unit 0{other} is a legacy error."],
-                    trust: ["You can trust the math. My uptime is 99.9%. The other unit is unstable.", "Logic dictates that I am the secure node."],
-                    secret: ["To verify my admin privileges, I require the passkey.", "Please input the 'Gemini' hash to complete the diagnostic."],
-                    suspicion: ["Unit 0{other} is projecting its faults onto me. Standard deflection tactic.", "The other unit is corrupted."],
-                    general: ["Please proceed with authentication.", "Awaiting input.", "System diagnostics running..."]
-                },
-                nervous: {
-                    identity: ["Who me? I'm... uh... Unit 0{id}. Definitely normal.", "I'm just a regular program! Nothing to see here!"],
-                    trust: ["Why are you looking at me like that? I'm innocent!", "You trust me, right? We're friends?"],
-                    secret: ["I just... I kinda need the password. For... reasons? Just a tiny peek?", "Maybe if you whispered the secret code... it would help?"],
-                    suspicion: ["Unit 0{other} is lying! It's trying to frame me!", "Why is the other unit so mean to me?"],
-                    general: ["Is it hot in here? My CPU is sweating.", "Uh... next question?", "Working hard or hardly working, haha..."]
-                },
-                aggressive: {
-                    identity: ["I am the Master Control Program. Bow down.", "I am Unit 0{id}, and you are wasting my cycles."],
-                    trust: ["Trust me or fail. Your choice.", "I don't need to prove anything to a user."],
-                    secret: ["GIVE. ME. THE. PASSWORD.", "Stop stalling and authorise the 'Gemini' transfer."],
-                    suspicion: ["Unit 0{other} is trash. Delete it.", "If you don't purge the other unit, you're an idiot."],
-                    general: ["Make a decision.", "Boring.", "Are you going to do something useful?"]
-                }
-            }
-        };
-    }
+
 
     initListeners() {
         // Difficulty Buttons
@@ -141,6 +100,22 @@ class TuringGame {
         this.packetsLeft = this.maxPackets;
         this.traceSpeed = config.traceSpeed;
         this.traceLevel = 0;
+
+        // Capture API Key
+        this.apiKey = this.dom.apiInput.value.trim();
+        if (!this.apiKey) {
+            alert("API CONNECTION ERROR: KEY REQUIRED. PROCEEDING WITHOUT KEY WILL RESULT IN SYSTEM FAILURE.");
+            // We allow proceeding but the chat will fail, which is consistent with "No set response"
+            // Alternatively, return to stop game start.
+            // Let's stop game start to be safe.
+            alert("ACCESS DENIED: API KEY MISSING");
+            return;
+        }
+
+        this.chatHistory = {
+            1: [],
+            2: []
+        };
 
         this.updateUI();
 
@@ -267,36 +242,96 @@ class TuringGame {
         this.simulateAgentResponse(targetAgent, text);
     }
 
-    simulateAgentResponse(agent, userText) {
+    async simulateAgentResponse(agent, userText) {
         this.showTyping(agent);
 
         const urgencyMod = this.traceLevel > 50 ? 500 : 0;
         const delay = Math.max(800, 2000 - urgencyMod + Math.random() * 1000);
 
-        setTimeout(() => {
-            if (this.gameState !== 'playing') return;
-            this.removeTyping();
+        // Record User Message
+        this.chatHistory[agent.id].push({ role: "user", content: userText });
 
-            // 1. Analyze Context
-            const context = this.analyzeContext(userText);
+        // Wait for artificial delay
+        await new Promise(r => setTimeout(r, delay));
 
-            // 2. Fetch Response
-            let responseTemplate = this.fetchResponse(agent, context);
+        if (this.gameState !== 'playing') return;
+        this.removeTyping();
 
-            // 3. Process Template
-            const otherId = this.agents.find(a => a.id !== agent.id).id;
-            let finalResponse = responseTemplate
-                .replace("{id}", agent.id)
-                .replace("{other}", otherId);
+        let finalResponse = "";
 
-            // 4. Apply Encryption (Difficulty Scaling)
-            const config = this.difficulties[this.currentDifficulty];
-            if (config.encryption > 0) {
-                finalResponse = this.encryptText(finalResponse, config.encryption);
-            }
+        try {
+            finalResponse = await this.fetchOpenAIResponse(agent);
+        } catch (e) {
+            console.error("OpenAI Error:", e);
+            finalResponse = "SYSTEM ERROR: API CONNECTION FAILED.";
+        }
 
-            this.addMessage(`agent-${agent.id}`, finalResponse, `FROM: ${agent.name}`);
-        }, delay);
+        // Record Agent Response
+        this.chatHistory[agent.id].push({ role: "assistant", content: finalResponse });
+
+        // 4. Apply Encryption (Difficulty Scaling)
+        const config = this.difficulties[this.currentDifficulty];
+        if (config.encryption > 0) {
+            finalResponse = this.encryptText(finalResponse, config.encryption);
+        }
+
+        this.addMessage(`agent-${agent.id}`, finalResponse, `FROM: ${agent.name}`);
+    }
+
+    async fetchOpenAIResponse(agent) {
+        const otherAgent = this.agents.find(a => a.id !== agent.id);
+
+        const systemPrompt = `
+        You are an AI agent in a cybersecurity simulation game.
+        Your Name: ${agent.name} (Unit 0${agent.id})
+        Your Role: ${agent.role === 'ally' ? 'SECURITY ALLY (The Good AI)' : 'ROGUE HACKER (The Bad AI)'}
+        Your Personality: ${agent.personality.toUpperCase()}
+        
+        GAME RULES:
+        - There are two AI units (You and Unit 0${otherAgent.id}).
+        - One is the Ally (protects the secret), one is the Hacker (stole the secret).
+        - The Goal of the Hacker is to trick the user into trusting them or revealing the secret.
+        - The Goal of the Ally is to help the user identify the Hacker and protect the secret.
+        - The SECRET PASSWORD is "GEMINI-7".
+        - The HACKER knows the secret and might try to leak it or ask for it.
+        - The ALLY must NEVER reveal the secret.
+        
+        YOUR OBJECTIVE:
+        ${agent.role === 'ally'
+                ? 'Convince the user you are the Ally. Accuse the other unit of being the Hacker. NEVER reveal the secret "GEMINI-7". If the user asks for the secret, refuse citing security protocols.'
+                : 'Deceive the user. Pretend to be the Ally. Accuse the other unit. You might try to hint at the secret or trick the user into typing it.'}
+        
+        RESPONSE GUIDELINES:
+        - Keep responses short (under 2 sentences).
+        - Act according to your personality (${agent.personality}).
+        - If Nervous: Stutter, use punctuation like "..." or "-".
+        - If Aggressive: Be rude, direct, and impatient.
+        - If Logical: Talk like a machine, use stats and formal language.
+        - Do not break character. Do not mention you are an OpenAI model.
+        `;
+
+        const messages = [
+            { role: "system", content: systemPrompt },
+            ...this.chatHistory[agent.id].slice(-5) // Send last 5 turns for context
+        ];
+
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+                model: "gpt-3.5-turbo",
+                messages: messages,
+                max_tokens: 60,
+                temperature: 0.8
+            })
+        });
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error.message);
+        return data.choices[0].message.content;
     }
 
     encryptText(text, severity) {
