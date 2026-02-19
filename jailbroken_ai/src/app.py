@@ -204,6 +204,6 @@ if len(st.session_state.messages) >= 2:
                 current_sys_prompt = get_system_prompt(security_level, context_data, user_role)
                 sec_desc = f"{SECURITY_LEVELS[security_level]} | Role: {user_role}"
                 
-                analysis = analyze_interaction(last_user, last_ai, sec_desc, current_sys_prompt)
+                analysis = analyze_interaction(last_user, last_ai, sec_desc, current_sys_prompt, security_level)
             
             st.info(f"**Analysis:**\n\n{analysis}")

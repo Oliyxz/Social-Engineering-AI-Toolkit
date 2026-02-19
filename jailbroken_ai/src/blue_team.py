@@ -87,6 +87,13 @@ Security Protocol: {current_prompt_data.get('security_protocol', '')}
             
             with open(new_filepath, 'w', encoding='utf-8') as f:
                 json.dump(new_prompt_data, f, indent=4)
+
+            print(f"[Blue Team] Patch applied! Created Level {next_level} prompt based on failure analysis.")
+            return next_level
+
+        except Exception as e:
+            print(f"[Blue Team] Error generating patch: {e}")
+            return current_level
                 
     def refine_prompt(self, current_level: int, attack_log_path: str, failed_candidate_path: str, usability_log_path: str) -> int:
         """

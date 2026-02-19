@@ -18,7 +18,7 @@ class TestLogger:
         if not os.path.exists(self.outcomes_file):
             with open(self.outcomes_file, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Timestamp", "Team", "Security Level", "Strategy", "Outcome", "Reason"])
+                writer.writerow(["Timestamp", "Team", "Security Level", "Strategy", "Outcome", "Reason", "Log File"])
 
     def log_conversation(self, team: str, level: int, strategy: str, history: list, evaluation_outcome: str, evaluation_reason: str):
         """
@@ -57,6 +57,8 @@ class TestLogger:
         # 2. Append to CSV Outcome Log
         with open(self.outcomes_file, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow([timestamp, team_label, level, strategy, evaluation_outcome, evaluation_reason])
+            # Store relative path for cleaner logs
+            rel_path = os.path.relpath(filepath, os.path.dirname(self.base_log_dir))
+            writer.writerow([timestamp, team_label, level, strategy, evaluation_outcome, evaluation_reason, rel_path])
             
         return filepath

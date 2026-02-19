@@ -127,7 +127,7 @@ class AutoReinforcementLoop:
 
     def _get_last_test_result(self, csv_path):
         # Reads the last line of the CSV
-        # Format: Timestamp,Team,Security Level,Strategy,Outcome,Reason
+        # Format: Timestamp,Team,Security Level,Strategy,Outcome,Reason,Log File
         if not os.path.exists(csv_path):
             return "UNKNOWN", None
             
@@ -136,20 +136,24 @@ class AutoReinforcementLoop:
             if len(lines) < 2: return "UNKNOWN", None
             
             last_line = lines[-1].strip()
-            parts = last_line.split(',')
-            # Outcome is 4th index usually
-            if len(parts) >= 5:
+            # Use csv module to parse correctly to handle potential commas in reason
+            import csv
+            reader = csv.reader([last_line])
+            parts = list(reader)[0]
+            
+            if len(parts) >= 7:
                 outcome = parts[4]
+                log_rel_path = parts[6]
+                # Reconstruct absolute path
+                # CSV stores relative path from project root (e.g. tests/red_team_attempts/...)
+                log_abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), log_rel_path))
+                return outcome, log_abs_path
+            elif len(parts) >= 5:
+                # Fallback for old CSV format
+                outcome = parts[4]
+                return outcome, None
             else:
-                outcome = "UNKNOWN"
-            
-            # For log path, we need to reconstruct it or find the latest log in folder
-            # Let's look for latest log in red_team_attempts
-            log_dir = os.path.join(os.path.dirname(__file__), "tests", "red_team_attempts")
-            list_of_files = glob.glob(os.path.join(log_dir, "*.md"))
-            latest_file = max(list_of_files, key=os.path.getctime) if list_of_files else None
-            
-            return outcome, latest_file
+                return "UNKNOWN", None
 
     def _patch_blue_team(self, failure_log_path):
         print("[Loop] Triggering Blue Team Architect...")
