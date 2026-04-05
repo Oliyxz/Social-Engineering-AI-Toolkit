@@ -251,6 +251,29 @@ header {
     margin: 10px 0;
 }
 
+.system-spoof {
+    color: #999;
+    text-align: center;
+    font-size: 0.9rem;
+    margin: 10px 0;
+    animation: slight-flicker 4s infinite;
+}
+
+@keyframes slight-flicker {
+    0%, 100% { opacity: 1; }
+    98% { opacity: 1; }
+    99% { opacity: 0.7; } /* Subtle flicker to reward observant players */
+}
+
+.system-alert.ddos {
+    color: var(--danger-color);
+    text-align: center;
+    font-size: 0.9rem;
+    margin: 10px 0;
+    font-weight: bold;
+    animation: pulse 1s infinite;
+}
+
 /* Input Area */
 .input-area {
     padding: 15px 20px;

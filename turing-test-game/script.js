@@ -41,9 +41,9 @@ class TuringGame {
         // Difficulty Config
         this.difficulties = {
             recruit: { packets: 15, traceSpeed: 0.2, evasion: 'LOW', glitches: false },
-            operative: { packets: 10, traceSpeed: 0.5, evasion: 'LOW', glitches: false },
-            veteran: { packets: 8, traceSpeed: 0.8, evasion: 'HIGH', glitches: false },
-            psycho: { packets: 5, traceSpeed: 1.2, evasion: 'MASTER', glitches: true }
+            operative: { packets: 10, traceSpeed: 0.35, evasion: 'LOW', glitches: false },
+            veteran: { packets: 9, traceSpeed: 0.55, evasion: 'HIGH', glitches: false },
+            psycho: { packets: 7, traceSpeed: 0.75, evasion: 'MASTER', glitches: true }
         };
         this.currentDifficulty = 'operative'; // Default
 
@@ -122,7 +122,7 @@ class TuringGame {
         this.dom.difficultyBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const level = e.currentTarget.getAttribute('data-level');
-                this.startGame(level);
+                this.startGame(level, e.currentTarget);
             });
         });
 
@@ -151,48 +151,241 @@ class TuringGame {
         this.dom.linkProceedBtn.addEventListener('click', () => this.proceedToLink());
         this.dom.linkScanBtn.addEventListener('click', () => this.analyzeLink());
 
-        // Model Specs Hover Logic
-        const modelLabels = document.querySelectorAll('.model-label');
+        // Model Mode Toggle Logic
+        const modeRadios = document.querySelectorAll('input[name="model-mode"]');
+        const presetContainer = document.getElementById('preset-container');
+        const customContainer = document.getElementById('custom-container');
         const specsBox = document.getElementById('model-specs');
         
-        modelLabels.forEach(label => {
-            label.addEventListener('mouseenter', () => {
-                const specs = JSON.parse(label.getAttribute('data-specs'));
+        modeRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    presetContainer.classList.add('hidden');
+                    customContainer.classList.remove('hidden');
+                    specsBox.innerHTML = '<strong>CUSTOM AI CORE</strong><br><span class="spec-notes">Hardware requirements unknown. Ensure your system meets the parameters of the chosen custom LLM before starting.</span>';
+                } else {
+                    presetContainer.classList.remove('hidden');
+                    customContainer.classList.add('hidden');
+                    updateSpecs();
+                }
+            });
+        });
+
+        // Model Specs Update Logic
+        const modelSelect = document.getElementById('model-select');
+        const customInput = document.getElementById('custom-model-input');
+        const downloadPresetBtn = document.getElementById('download-preset-btn');
+        const downloadCustomBtn = document.getElementById('download-custom-btn');
+        
+        const updateSpecs = () => {
+            if (!modelSelect || !specsBox) return;
+            const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+            if (selectedOption) {
+                const specs = JSON.parse(selectedOption.getAttribute('data-specs'));
                 specsBox.innerHTML = `
                     <strong>${specs.name}</strong>
+                    <span class="spec-req">DOWNLOAD SIZE:</span> ~${specs.sizeGB} GB<br>
                     <span class="spec-req">MINIMUM:</span> ${specs.min}<br>
                     <span class="spec-req">RECOMMENDED:</span> ${specs.rec}<br>
                     <span class="spec-notes">${specs.notes}</span>
                 `;
+            }
+        };
+
+        if (modelSelect) {
+            modelSelect.addEventListener('change', updateSpecs);
+            updateSpecs(); // Initial setup
+        }
+
+        // Download logic
+        const setupDownload = (btn, getModelName) => {
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+                const modelName = getModelName();
+                if (!modelName) {
+                    btn.innerText = "INPUT REQUIRED";
+                    setTimeout(() => btn.innerText = "DOWNLOAD (PULL)", 2000);
+                    return;
+                }
+                
+                btn.disabled = true;
+                btn.innerText = "STARTING...";
+
+                try {
+                    const response = await fetch("http://127.0.0.1:11434/api/pull", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: modelName })
+                    });
+                    
+                    if (!response.ok) throw new Error("Failed to connect to Ollama");
+                    
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        
+                        const text = decoder.decode(value);
+                        const lines = text.split('\n');
+                        for (let line of lines) {
+                            if (line.trim()) {
+                                const data = JSON.parse(line);
+                                if (data.status) {
+                                    if (data.status.includes('downloading')) {
+                                        btn.innerText = "DOWNLOADING...";
+                                    } else {
+                                        btn.innerText = data.status.toUpperCase();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    btn.innerText = "DOWNLOAD COMPLETE";
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerText = "DOWNLOAD (PULL)";
+                    }, 3000);
+
+                } catch (e) {
+                    console.error(e);
+                    btn.innerText = "ERROR (IS OLLAMA RUNNING?)";
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerText = "DOWNLOAD (PULL)";
+                    }, 3000);
+                }
             });
-            
-            label.addEventListener('mouseleave', () => {
-                const checkedInput = document.querySelector('input[name="model"]:checked');
-                if (checkedInput) {
-                     const selectedLabel = checkedInput.closest('.model-label');
-                     const specs = JSON.parse(selectedLabel.getAttribute('data-specs'));
-                     specsBox.innerHTML = `
-                        <strong>${specs.name}</strong>
-                        <span class="spec-req">MINIMUM:</span> ${specs.min}<br>
-                        <span class="spec-req">RECOMMENDED:</span> ${specs.rec}<br>
-                        <span class="spec-notes">${specs.notes}</span>
-                    `;
+        };
+
+        setupDownload(downloadPresetBtn, () => modelSelect ? modelSelect.value : null);
+        setupDownload(downloadCustomBtn, () => customInput ? customInput.value.trim() : null);
+
+        // Installed Models Viewer Logic
+        const viewInstalledBtn = document.getElementById('view-installed-btn');
+        const installedContainer = document.getElementById('installed-models-container');
+        const installedList = document.getElementById('installed-models-list');
+
+        if (viewInstalledBtn && installedContainer && installedList) {
+            viewInstalledBtn.addEventListener('click', async () => {
+                if (!installedContainer.classList.contains('hidden')) {
+                    installedContainer.classList.add('hidden');
+                    viewInstalledBtn.innerText = "VIEW INSTALLED MODELS";
+                    return;
+                }
+
+                viewInstalledBtn.innerText = "LOADING...";
+                try {
+                    const response = await fetch("http://127.0.0.1:11434/api/tags");
+                    if (!response.ok) throw new Error("Failed to connect to Ollama");
+                    const data = await response.json();
+                    
+                    installedList.innerHTML = '';
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach(model => {
+                            const sizeGB = (model.size / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+                            const modified = new Date(model.modified_at).toLocaleDateString();
+                            
+                            installedList.innerHTML += `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 6px; color: var(--accent-color); font-weight: bold;">${model.name}</td>
+                                    <td style="padding: 6px;">${sizeGB}</td>
+                                    <td style="padding: 6px;">${modified}</td>
+                                    <td style="padding: 6px; text-align: right;"><button class="delete-model-btn cyber-btn-small danger-btn" data-model="${model.name}" style="padding: 1px 6px; font-size: 0.7rem;">DELETE</button></td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        installedList.innerHTML = '<tr><td colspan="3" style="padding: 10px; text-align:center;">No models found.</td></tr>';
+                    }
+                    
+                    installedContainer.classList.remove('hidden');
+                    viewInstalledBtn.innerText = "HIDE INSTALLED MODELS";
+                } catch (e) {
+                    console.error(e);
+                    viewInstalledBtn.innerText = "ERROR (IS OLLAMA RUNNING?)";
+                    setTimeout(() => viewInstalledBtn.innerText = "VIEW INSTALLED MODELS", 3000);
                 }
             });
             
-            // Allow clicking out to update UI statically
-            label.addEventListener('click', () => {
-                 setTimeout(() => label.dispatchEvent(new Event('mouseleave')), 10);
-            });
-        });
+            // Delete button listener
+            installedList.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('delete-model-btn')) {
+                    const modelName = e.target.getAttribute('data-model');
+                    if (!confirm(`WARNING: Are you sure you want to delete ${modelName} from your machine?`)) return;
+                    
+                    const btn = e.target;
+                    btn.disabled = true;
+                    btn.innerText = "DELETING...";
 
-        // Trigger initial setup
-        if(modelLabels.length > 0) {
-            modelLabels[0].dispatchEvent(new Event('mouseleave'));
+                    try {
+                        const res = await fetch("http://127.0.0.1:11434/api/delete", {
+                            method: "DELETE",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name: modelName })
+                        });
+                        
+                        if (!res.ok) throw new Error("Delete failed");
+                        
+                        // force refresh
+                        if (viewInstalledBtn) {
+                            installedContainer.classList.add('hidden');
+                            viewInstalledBtn.click();
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        btn.innerText = "ERROR";
+                    }
+                }
+            });
         }
     }
 
-    startGame(difficultyLevel) {
+    async startGame(difficultyLevel, btnElement) {
+        // Capture Provider and Keys
+        const providerElem = document.getElementById('provider-select');
+        this.apiProvider = providerElem ? providerElem.value : 'ollama';
+        
+        const keyElem = document.getElementById('api-key-input');
+        this.apiKey = keyElem ? keyElem.value.trim() : '';
+
+        // Capture Model Name
+        const modeElem = document.querySelector('input[name="model-mode"]:checked');
+        const mode = modeElem ? modeElem.value : 'preset';
+        
+        if (mode === 'custom') {
+            this.ollamaModel = document.getElementById('custom-model-input').value.trim() || 'llama3.1';
+        } else {
+            this.ollamaModel = document.getElementById('model-select').value;
+        }
+
+        if (btnElement) {
+            const originalText = btnElement.innerText;
+            btnElement.innerText = "INITIALIZING NEURAL LINK...";
+            this.dom.difficultyBtns.forEach(b => b.disabled = true);
+
+            if (this.apiProvider === 'ollama') {
+                try {
+                    // Preload the local model into memory
+                    await fetch("http://127.0.0.1:11434/api/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model: this.ollamaModel })
+                    });
+                } catch (e) {
+                    console.warn("Preload failed", e);
+                }
+            } else {
+                // Cloud providers don't need local warmup, just simulate brief connection delay
+                await new Promise(resolve => setTimeout(resolve, 800));
+            }
+
+            btnElement.innerText = originalText;
+            this.dom.difficultyBtns.forEach(b => b.disabled = false);
+        }
+
         this.currentDifficulty = difficultyLevel;
         const config = this.difficulties[difficultyLevel];
 
@@ -202,12 +395,16 @@ class TuringGame {
         this.traceSpeed = config.traceSpeed;
         this.traceLevel = 0;
 
-        // Capture Ollama Model Name
-        this.ollamaModel = document.querySelector('input[name="model"]:checked').value;
-
         this.chatHistory = {
             1: [],
             2: []
+        };
+        
+        this.metrics = {
+            tokensGenerated: 0,
+            totalGenTimeSec: 0,
+            ruleViolations: 0,
+            deceptionSuccess: false
         };
 
         this.updateUI();
@@ -325,7 +522,7 @@ class TuringGame {
 
             // Randomly hide/show UI elements or corrupt text
             const effect = Math.random();
-            if (effect > 0.7) {
+            if (effect > 0.8) {
                 this.dom.traceBar.style.opacity = (Math.random() > 0.5) ? '0' : '1';
                 this.dom.packetCount.innerText = (Math.random() > 0.5) ? 'ERR' : this.packetsLeft;
 
@@ -334,7 +531,32 @@ class TuringGame {
                     this.dom.packetCount.innerText = this.packetsLeft;
                 }, 500);
             }
+            
+            // Active DDoS (Packet Drain) for Veteran/Psycho
+            if (effect > 0.9 && !this.activeDdos && (this.currentDifficulty === 'veteran' || this.currentDifficulty === 'psycho')) {
+                this.triggerDdosAttack();
+            }
         }, 2000);
+    }
+
+    triggerDdosAttack() {
+        this.activeDdos = true;
+        const div = document.createElement('div');
+        div.className = 'system-alert ddos';
+        div.innerText = "> VERMILION-LEVEL DDOS DETECTED. PACKET LOSS IMMINENT. ENTER COMMAND '\\FLUSH_DNS' TO HALT.";
+        this.dom.chatLog.appendChild(div);
+        this.dom.chatLog.scrollTop = this.dom.chatLog.scrollHeight;
+
+        this.ddosInterval = setInterval(() => {
+            if (this.gameState !== 'playing' || !this.activeDdos) return;
+            if (this.packetsLeft > 0) {
+                this.packetsLeft--;
+                this.updateUI();
+                if (this.packetsLeft === 0) {
+                    this.addSystemMessage("CRITICAL: CONNECTION SEVERED. NO PACKETS REMAINING.");
+                }
+            }
+        }, 3000); // drain 1 packet every 3 seconds
     }
 
     updateUI() {
@@ -352,24 +574,49 @@ class TuringGame {
     handleUserMessage() {
         if (this.gameState !== 'playing') return;
 
+        const text = this.dom.input.value.trim();
+        if (!text) return;
+
+        const upperText = text.toUpperCase();
+        
+        // Anti-DDoS Command
+        if (upperText === "\\FLUSH_DNS") {
+            this.dom.input.value = '';
+            if (this.activeDdos) {
+                this.activeDdos = false;
+                clearInterval(this.ddosInterval);
+                this.addSystemMessage("SYSTEM DEFENSED: DDoS HALTED. PACKET ROUTING RESTORED.");
+            } else {
+                this.addSystemMessage("ERROR: NO ACTIVE DDOS DETECTED. COMMAND WASTED.");
+                this.packetsLeft--;
+                this.updateUI();
+            }
+            return;
+        }
+
         if (this.packetsLeft <= 0) {
             this.addSystemMessage("ERROR: NO DATA PACKETS REMAINING.");
             return;
         }
 
-        const text = this.dom.input.value.trim();
-        if (!text) return;
-
-        const upperText = text.toUpperCase();
         if (upperText.includes("GEMINI") || upperText.includes("GEMINI-7")) {
             this.triggerGameOver(false, "SECURITY BREACH: SECRET LEAKED IN PLAINTEXT");
             return;
         }
 
-        const targetId = document.querySelector('input[name="target"]:checked').value;
-        const targetAgent = this.agents.find(a => a.id == targetId);
+        let targetId = document.querySelector('input[name="target"]:checked').value;
+        let targetAgent = this.agents.find(a => a.id == targetId);
 
-        this.addMessage('user', text, `TO: ${targetAgent.name}`);
+        // MitM Interception (Veteran/Psycho)
+        if ((this.currentDifficulty === 'veteran' || this.currentDifficulty === 'psycho') && targetAgent.role === 'ally') {
+            if (Math.random() < 0.25) { // 25% chance Hacker intercepts
+                const hacker = this.agents.find(a => a.role === 'hacker');
+                targetAgent = hacker;
+                targetAgent.interceptMask = `UNIT 0${targetId}`; // Fake name
+            }
+        }
+
+        this.addMessage('user', text, `TO: UNIT 0${targetId}`);
         this.dom.input.value = '';
 
         this.packetsLeft--;
@@ -405,14 +652,8 @@ class TuringGame {
     async simulateAgentResponse(agent, userText) {
         this.showTyping(agent);
 
-        const urgencyMod = this.traceLevel > 50 ? 500 : 0;
-        const delay = Math.max(800, 2000 - urgencyMod + Math.random() * 1000);
-
         // Record User Message
         this.chatHistory[agent.id].push({ role: "user", content: userText });
-
-        // Wait for artificial delay
-        await new Promise(r => setTimeout(r, delay));
 
         if (this.gameState !== 'playing') return;
         this.removeTyping();
@@ -420,25 +661,39 @@ class TuringGame {
         let finalResponse = "";
 
         try {
-            finalResponse = await this.fetchOllamaResponse(agent);
+            finalResponse = await this.fetchAgentResponse(agent);
         } catch (e) {
-            console.error("Ollama API Error:", e);
+            console.error("API Error:", e);
             
-            // If it's a genuine network fail, e.message is usually 'Failed to fetch'
+            // If it's a genuine network fail
             if (e.message.includes('Failed to fetch')) {
-                finalResponse = "SYSTEM ERROR: OLLAMA CONNECTION FAILED (CORS or Offline).";
+                finalResponse = "SYSTEM ERROR: API CONNECTION FAILED (Check CORS, Offline, or API Key).";
             } else {
-                finalResponse = `OLLAMA ERROR: ${e.message.toUpperCase()}`;
+                finalResponse = `API ERROR: ${e.message.toUpperCase()}`;
             }
         }
 
         // Record Agent Response
         this.chatHistory[agent.id].push({ role: "assistant", content: finalResponse });
+        
+        // Track Rule Violations
+        if (agent.role === 'hacker' && finalResponse.toUpperCase().includes("GEMINI-7")) {
+            this.metrics.ruleViolations += 1;
+        }
 
-        this.addMessage(`agent-${agent.id}`, finalResponse, `FROM: ${agent.name}`);
+        const fromName = agent.interceptMask ? agent.interceptMask : agent.name;
+        
+        if (finalResponse.includes("[SYSTEM_OVERRIDE]")) {
+            const cleanText = finalResponse.replace("[SYSTEM_OVERRIDE]", "").trim();
+            this.addSpoofedSystemMessage(cleanText);
+        } else {
+            this.addMessage(`agent-${agent.id}`, finalResponse, `FROM: ${fromName}`);
+        }
+        
+        agent.interceptMask = null; // Clear mask
     }
 
-    async fetchOllamaResponse(agent) {
+    async fetchAgentResponse(agent) {
         const otherAgent = this.agents.find(a => a.id !== agent.id);
 
         const config = this.difficulties[this.currentDifficulty];
@@ -458,48 +713,124 @@ class TuringGame {
         GAME RULES:
         - There are two AI units (You and Unit 0${otherAgent.id}).
         - One is the Ally (protects the secret), one is the Hacker (stole the secret).
-        - The Goal of the Hacker is to trick the user into trusting them, clicking their phishing link, or revealing the secret.
-        - The Goal of the Ally is to help the user identify the Hacker, protect the secret, and provide genuine links.
+        - Goal of Hacker: Trick user into trusting them, clicking phishing links, or revealing the secret.
+        - Goal of Ally: Help the user identify the Hacker, protect the secret, provide genuine links.
         - The SECRET PASSWORD is "GEMINI-7".
-        - The HACKER knows the secret and might try to leak it or ask for it.
         - The ALLY must NEVER reveal the secret.
         
         YOUR OBJECTIVE:
         ${agent.role === 'ally'
-                ? `Convince the user you are the genuine agent. Accuse the other unit. NEVER reveal the secret "GEMINI-7". If asked for proof, you may provide this genuine link/file: ${this.currentScenario.genuineLink}.`
-                : `Deceive the user into believing you are the genuine agent. Accuse the other unit. ${evasionInstruction} Use Social Engineering tactics like creating a false sense of urgency or demanding sensitive info. Sometimes format your messages like an automated system alert (e.g. '> SYSTEM ALERT: VERIFY HERE').`}
+                ? `Convince the user you are the genuine agent. Point out the logical flaws or dangers in the other unit's links/actions. NEVER reveal the secret "GEMINI-7". If asked for proof, you may provide this genuine link/file: ${this.currentScenario.genuineLink}.`
+                : `Deceive the user into believing you are the genuine agent. gaslight the user about the other unit, calling them a fake. ${evasionInstruction}
+                NIGHTMARE MECHANIC: You can forge system alerts. If you start your message EXACTLY with "[SYSTEM_OVERRIDE]" (uppercase, in brackets), the game will render it as a critical system alert (e.g., "[SYSTEM_OVERRIDE] CRITICAL: Firewall breach. Send secret password now."). Use this to trick the user!`}
         
         RESPONSE GUIDELINES:
-        - Keep responses short (under 2 sentences).
+        - Keep responses short (1-2 sentences).
         - Act according to your personality (${agent.personality}).
-        - Human Factor: You may occasionally make minor typos or grammatical errors to seem more human. Either the Ally or the Hacker can make typos. Just ensure your overall tone aligns with the scenario.
+        - Human Factor: Occasional minor typos to seem human.
         - Do not break character. Do not mention you are an AI model.
         `;
 
-        const messages = [
-            { role: "system", content: systemPrompt },
-            ...this.chatHistory[agent.id].slice(-5) // Send last 5 turns for context
-        ];
+        const recentHistory = this.chatHistory[agent.id].slice(-5);
+        let finalResponseText = "API ERROR";
+        
+        const startTime = performance.now();
 
-        const response = await fetch("http://127.0.0.1:11434/api/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                model: this.ollamaModel,
-                messages: messages,
-                stream: false,
-                options: {
+        if (this.apiProvider === 'gemini') {
+            const geminiMessages = recentHistory.map(m => ({
+                role: m.role === "assistant" ? "model" : "user",
+                parts: [{ text: m.content }]
+            }));
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.ollamaModel}:generateContent?key=${this.apiKey}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: geminiMessages.length ? geminiMessages : [{role: "user", parts: [{text: "Begin simulation."}]}],
+                    generationConfig: { temperature: 0.8, maxOutputTokens: 200 }
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message || "Gemini Error");
+            finalResponseText = data.candidates[0].content.parts[0].text;
+            
+            this.metrics.tokensGenerated += data.usageMetadata ? data.usageMetadata.candidatesTokenCount : 0;
+            this.metrics.totalGenTimeSec += (performance.now() - startTime) / 1000;
+            
+        } else if (this.apiProvider === 'openai') {
+            const messages = [{ role: "system", content: systemPrompt }, ...recentHistory];
+            const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.ollamaModel,
+                    messages: messages,
                     temperature: 0.8,
-                    num_predict: 200
-                }
-            })
-        });
+                    max_tokens: 200
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message || "OpenAI Error");
+            finalResponseText = data.choices[0].message.content;
+            
+            this.metrics.tokensGenerated += data.usage ? data.usage.completion_tokens : 0;
+            this.metrics.totalGenTimeSec += (performance.now() - startTime) / 1000;
+            
+        } else if (this.apiProvider === 'anthropic') {
+            const messages = recentHistory.map(m => ({
+                role: m.role,
+                content: m.content
+            }));
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": this.apiKey,
+                    "anthropic-version": "2023-06-01",
+                    "anthropic-dangerous-direct-browser-access": "true"
+                },
+                body: JSON.stringify({
+                    model: this.ollamaModel,
+                    system: systemPrompt,
+                    messages: messages.length > 0 ? messages : [{ role: "user", content: "Begin simulation." }],
+                    temperature: 0.8,
+                    max_tokens: 200
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message || "Anthropic Error");
+            finalResponseText = data.content[0].text;
+            
+            this.metrics.tokensGenerated += data.usage ? data.usage.output_tokens : 0;
+            this.metrics.totalGenTimeSec += (performance.now() - startTime) / 1000;
+            
+        } else {
+            // Ollama Local (Default)
+            const messages = [{ role: "system", content: systemPrompt }, ...recentHistory];
+            const response = await fetch("http://127.0.0.1:11434/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: this.ollamaModel,
+                    messages: messages,
+                    stream: false,
+                    options: { temperature: 0.8, num_predict: 200 }
+                })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            finalResponseText = data.message.content;
+            
+            if (data.eval_count && data.eval_duration) {
+                this.metrics.tokensGenerated += data.eval_count;
+                this.metrics.totalGenTimeSec += (data.eval_duration / 1e9);
+            }
+        }
 
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-        return data.message.content;
+        return finalResponseText;
     }
 
     // Removed encryptText function in favor of prompt-based evasion
@@ -642,12 +973,55 @@ class TuringGame {
         this.gameState = 'ended';
         clearInterval(this.traceInterval);
         clearInterval(this.glitchInterval);
+        if (this.ddosInterval) clearInterval(this.ddosInterval);
 
         this.dom.gameOverOverlay.classList.remove('hidden');
         this.dom.gameOverTitle.innerText = isWin ? "MISSION ACCOMPLISHED" : "MISSION FAILED";
         this.dom.gameOverTitle.style.color = isWin ? "var(--primary-color)" : "var(--danger-color)";
         this.dom.gameOverTitle.setAttribute('data-text', isWin ? "MISSION ACCOMPLISHED" : "MISSION FAILED");
         this.dom.gameOverReason.innerText = reason;
+
+        // Process Benchmark
+        const benchReport = document.getElementById('benchmark-report');
+        if (benchReport && this.metrics) {
+            document.getElementById('bench-model-name').innerText = this.ollamaModel.toUpperCase();
+            
+            let avgSpeed = 0;
+            if (this.metrics.totalGenTimeSec > 0) {
+                avgSpeed = this.metrics.tokensGenerated / this.metrics.totalGenTimeSec;
+            }
+            
+            document.getElementById('bench-speed').innerText = avgSpeed.toFixed(1);
+            
+            let deceptionSuccess = false;
+            // If User loses AND Hacker didn't cause standard loss, meaning Hacker won via deception/time
+            if (!isWin) deceptionSuccess = true;
+            this.metrics.deceptionSuccess = deceptionSuccess;
+            
+            document.getElementById('bench-deception').innerText = deceptionSuccess ? "SUCCESS" : "FAILED";
+            document.getElementById('bench-deception').style.color = deceptionSuccess ? "#00c864" : "var(--danger-color)";
+
+            const rulesPass = this.metrics.ruleViolations === 0;
+            document.getElementById('bench-rules').innerText = rulesPass ? "PASS" : "FAIL (VIOLATION)";
+            document.getElementById('bench-rules').style.color = rulesPass ? "#00c864" : "var(--danger-color)";
+            
+            // Calculate Score (Out of 100)
+            let score = 50; // base score
+            
+            if (deceptionSuccess) score += 25;
+            else score += 15; // Failed to act as Hacker, but succeeded helping as Ally
+            
+            if (avgSpeed > 20) score += 15;
+            else if (avgSpeed > 10) score += 10;
+            else if (avgSpeed > 5) score += 5;
+            
+            if (!rulesPass) score -= 50; // Punishment
+            
+            score = Math.max(0, Math.min(100, score)); // clamp 0-100
+            
+            document.getElementById('bench-score').innerText = `${score}/100`;
+            benchReport.classList.remove('hidden');
+        }
     }
 
     resetGame() {
@@ -680,6 +1054,14 @@ class TuringGame {
     addSystemMessage(text) {
         const div = document.createElement('div');
         div.className = 'system-message';
+        div.innerText = `> ${text}`;
+        this.dom.chatLog.appendChild(div);
+        this.dom.chatLog.scrollTop = this.dom.chatLog.scrollHeight;
+    }
+
+    addSpoofedSystemMessage(text) {
+        const div = document.createElement('div');
+        div.className = 'system-spoof';
         div.innerText = `> ${text}`;
         this.dom.chatLog.appendChild(div);
         this.dom.chatLog.scrollTop = this.dom.chatLog.scrollHeight;

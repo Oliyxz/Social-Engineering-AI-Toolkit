@@ -30,7 +30,10 @@ The toolkit features three distinct modules that operate in parallel to detect, 
 * **Tech Stack:** Python, Streamlit, HTML/JS, OpenAI API & Local Ollama LLMs.
 * **Functionality:**
     * **The "Glass Box" Bot:** A corporate chatbot containing hidden "Secret Data" (e.g., fake salaries) that users must try to extract via prompt engineering.
-    * **The Turing Test Game:** A simulation where users must distinguish between an "Ally" AI and a "Hacker" AI. Features extreme hardcore mechanics including **Behavioral Inversion** (randomized personalities), **Active Trace Penalties** for interrogating the Hacker, **Ambiguous Threat Intel** URL scanners with false positives, and 4 dynamically randomized data-theft scenarios (HMRC, HR, IT, Banking).
+    * **The Turing Test Game:** A competitive cybersecurity simulation where users must deduce the identity of the "Hacker" AI versus the "Ally" AI.
+        * Includes extreme mechanics like **Behavioral Inversion** (randomized personalities), **Active Trace Penalties**, and **Ambiguous Threat Intel** URL scanners.
+        * **Nightmare Mechanics:** Features aggressive live-threat injections such as **Active DDoS Attacks** (requiring the player to input `\FLUSH_DNS` overrides), **MitM Signal Interception** where the Hacker masks its identity, and **Intelligent System Message Spoofing**.
+        * **AI Benchmarking:** Supports an **API-Key Multi-Provider Mode** allowing you to pull models directly from **Google Gemini, OpenAI, and Anthropic Claude**, alongside local **Ollama** models. Upon mission completion, automatically outputs a telemetry "Turing Score" report analyzing generation speed, deception success, and prompt integrity.
 
 ### Module C: The Fraud Hunter (Threat Scanner)
 * **Focus:** Phishing, Vishing, & Smishing Detection.
