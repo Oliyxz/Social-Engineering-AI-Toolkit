@@ -9,23 +9,13 @@
 ## 1. Project Overview
 The **Social Engineering AI Toolkit** is a research and defense project developed by the **BCU Cyber Security Society**. It moves beyond traditional network security to address the "Human Element" of cybersecurity.
 
-The toolkit features three distinct modules that operate in parallel to detect, simulate, and analyze social engineering threats:
-1.  **Biometric Identity Verification:** A physical "Gatekeeper" system to detect impersonation.
-2.  **AI Vulnerability Lab:** A demonstration of LLM Prompt Injection and "Jailbreaking."
-3.  **Communication Threat Scanner:** A tool to analyze and flag phishing across Email, SMS, and Voice.
+The toolkit features two distinct modules that operate in parallel to detect, simulate, and analyze social engineering threats:
+1.  **AI Vulnerability Lab:** A demonstration of LLM Prompt Injection and "Jailbreaking."
+2.  **Communication Threat Scanner:** A tool to analyze and flag phishing across Email, SMS, and Voice.
 
 ## 2. Architecture & Modules
 
-### Module A: The Biometric Gatekeeper (Hardware)
-* **Focus:** Physical Security & Impersonation Detection.
-* **Tech Stack:** C++, OpenCV, Raspberry Pi 4.
-* **Functionality:**
-    * Captures dual video streams (Live Face + ID Card).
-    * Uses Computer Vision to compare facial embeddings.
-    * Calculates a "Match Confidence %" to validate identity.
-    * Generates a forensic report describing facial attributes (Age, Gender, etc.).
-
-### Module B: The GenAI Vulnerability Lab (Chatbot)
+### Module 1: The GenAI Vulnerability Lab (Chatbot)
 * **Focus:** AI Safety, Prompt Injection, & Social Engineering Games.
 * **Tech Stack:** Python, Streamlit, HTML/JS, OpenAI API & Local Ollama LLMs.
 * **Functionality:**
@@ -35,7 +25,7 @@ The toolkit features three distinct modules that operate in parallel to detect, 
         * **Nightmare Mechanics:** Features aggressive live-threat injections such as **Active DDoS Attacks** (requiring the player to input `\FLUSH_DNS` overrides), **MitM Signal Interception** where the Hacker masks its identity, and **Intelligent System Message Spoofing**.
         * **AI Benchmarking:** Supports an **API-Key Multi-Provider Mode** allowing you to pull models directly from **Google Gemini, OpenAI, and Anthropic Claude**, alongside local **Ollama** models. Upon mission completion, automatically outputs a telemetry "Turing Score" report analyzing generation speed, deception success, and prompt integrity.
 
-### Module C: The Fraud Hunter (Threat Scanner)
+### Module 2: The Fraud Hunter (Threat Scanner)
 * **Focus:** Phishing, Vishing, & Smishing Detection.
 * **Tech Stack:** Python, OpenAI API, SpeechRecognition.
 * **Functionality:**
@@ -43,13 +33,15 @@ The toolkit features three distinct modules that operate in parallel to detect, 
     * **Voice Scanner:** Transcribes `.mp3` / `.wav` audio files to detect "Vishing" scripts.
     * **Modular AI Datasets:** Utilizes Free-Shot prompting against customizable `.json` threat intelligence databases to massively boost local detection accuracy.
 
-## 3. Hardware Requirements
-To run the full suite (specifically Module A), the following hardware is required:
-* **Raspberry Pi 5** (8GB RAM recommended)
-* **Active Cooler** for Raspberry Pi (Critical for C++ compiling)
-* **2x USB Webcams** (Logitech C920 or similar)
-* **MicroSD Card** (32GB+, Class A2 speed recommended)
-* **Network Switch / Router** (For local demonstration network)
+## 3. Future Roadmap: The Biometric Gatekeeper (Hardware)
+While the core web and AI scanner modules are fully operational, the toolkit is designed to eventually integrate with a physical endpoint defense system. Due to time constraints, this hardware module is currently in active development.
+
+* **Focus:** Physical Security & Impersonation Detection.
+* **Upcoming Hardware Requirements:** Raspberry Pi 4/5, 1x USB Webcam.
+* **Planned Functionality:**
+    * Capture dual video streams (Live Face + ID Card).
+    * Use C++ and OpenCV to compare facial embeddings.
+    * Calculate a "Match Confidence %" to validate physical identity before granting network access.
 
 ## 4. Installation & Setup
 

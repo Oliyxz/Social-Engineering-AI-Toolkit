@@ -54,7 +54,97 @@ def check_virustotal_urls(text, api_key):
             
     return "\n".join(vt_results)
 
-def analyze_threat(text_to_analyze, input_type="Text", custom_dataset=None, image_b64=None, vt_api_key=None):
+def run_signature_scan(text):
+    import re
+    # Load YARA-Lite DB
+    rules_path = os.path.join(os.path.dirname(__file__), 'rules', 'threat_signatures.json')
+    try:
+        with open(rules_path, 'r') as f:
+            rules = json.load(f)
+    except:
+        return []
+        
+    matches = []
+    for rule in rules:
+        if "pattern" in rule and re.search(rule["pattern"], text):
+            matches.append(rule)
+            
+    return matches
+
+def analyze_email_headers(raw_email_text):
+    import email
+    import re
+    msg = email.message_from_string(raw_email_text)
+    
+    headers_report = []
+    has_spf_fail = False
+    has_dkim_fail = False
+    is_authenticated = False
+    auth_domain = ""
+    
+    auth_results = msg.get_all('Authentication-Results', [])
+    for res in auth_results:
+        res_lower = res.lower()
+        if 'spf=fail' in res_lower or 'spf=softfail' in res_lower:
+            has_spf_fail = True
+            headers_report.append("SPF FAILURE: The sender's IP is not authorized by the domain owner.")
+        if 'dkim=fail' in res_lower:
+            has_dkim_fail = True
+            headers_report.append("DKIM FAILURE: The email's cryptographic signature is invalid or tampered.")
+        if 'dmarc=fail' in res_lower:
+            headers_report.append("DMARC FAILURE: The email failed domain authentication alignments.")
+            
+        if 'dmarc=pass' in res_lower:
+            is_authenticated = True
+            match = re.search(r'header\.from=([\w.-]+)', res_lower)
+            if match:
+                auth_domain = match.group(1)
+            
+    return {
+        "is_forged": has_spf_fail or has_dkim_fail,
+        "is_authenticated": is_authenticated,
+        "auth_domain": auth_domain,
+        "report": headers_report
+    }
+
+def check_urlscan_io(text, api_key):
+    import re
+    urls = re.findall(r'(https?://[^\s<>"\']+)', text)
+    if not urls:
+        return ""
+    if not api_key:
+        return "URLs found, but no URLScan.io API key provided."
+        
+    urlscan_results = []
+    headers = {'API-Key': api_key}
+    
+    for url in set(urls):
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc
+            if not domain: continue
+            
+            search_url = f"https://urlscan.io/api/v1/search/?q=domain:{domain}"
+            resp = requests.get(search_url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                total = data.get("total", 0)
+                if total > 0:
+                    results = data.get("results", [])
+                    malicious_count = sum(1 for r in results if r.get("verdicts", {}).get("overall", {}).get("malicious"))
+                    urlscan_results.append(f"URLScan ({domain}): {total} previous scans found. {malicious_count} marked MALICIOUS.")
+                else:
+                    urlscan_results.append(f"URLScan ({domain}): No previous scans found on URLScan.io.")
+            elif resp.status_code == 401:
+                urlscan_results.append(f"URLScan ({domain}): Invalid API Key.")
+            else:
+                 urlscan_results.append(f"URLScan ({domain}): API Error {resp.status_code}")
+        except Exception as e:
+            urlscan_results.append(f"URLScan ({domain}): Check failed: {str(e)}")
+            
+    return "\n".join(urlscan_results)
+
+def analyze_threat(text_to_analyze, input_type="Text", custom_dataset=None, image_b64=None, vt_api_key=None, urlscan_api_key=None, header_analysis_result=None):
     import random
     
     if custom_dataset:
@@ -75,11 +165,22 @@ def analyze_threat(text_to_analyze, input_type="Text", custom_dataset=None, imag
         
     vt_report = check_virustotal_urls(text_to_analyze, vt_api_key)
     vt_context = f"\n\nVIRUSTOTAL URL ANALYSIS:\n{vt_report}\n\n" if vt_report else ""
+
+    urlscan_report = check_urlscan_io(text_to_analyze, urlscan_api_key)
+    urlscan_context = f"URLSCAN.IO REPORT:\n{urlscan_report}\n\n" if urlscan_report else ""
+    
+    header_context = ""
+    if header_analysis_result:
+        if header_analysis_result.get("is_forged"):
+            header_context = "\n\nCRITICAL SYSTEM ALERT: Cryptographic email headers (SPF/DKIM) have FAILED. This email is technically forged and definitively a phishing attempt.\n\n"
+        elif header_analysis_result.get("is_authenticated"):
+            domain = header_analysis_result.get("auth_domain", "the sender's domain")
+            header_context = f"\n\nCRITICAL SYSTEM ALERT: Cryptographic email headers (SPF/DKIM/DMARC) have PASSED for '{domain}'. This means the email was legally and cryptographically authorized by the official company. DO NOT mark this as a spoofed phishing attempt. IT IS HIGHLY LIKELY TO BE A GENUINE MARKETING EMAIL. You should generate a dynamic, low 'threat_score' (e.g., 5, 15) reflecting any mild suspicious characteristics in the content. Do not categorize it as a full threat unless there are undeniable zero-day malware links.\n\n"
     
     email_instructions = ""
     json_template = """{
   "is_threat": false,
-  "confidence": "10%",
+  "threat_score": 10,
   "indicators": ["indicator1"],
   "analysis": "**Point:** [Your main finding]\\n\\n**Evidence:** [The specific text/data that proves it]\\n\\n**Explanation:** [Why this matters]"
 }"""
@@ -88,11 +189,12 @@ def analyze_threat(text_to_analyze, input_type="Text", custom_dataset=None, imag
         email_instructions = """
 You MUST also include 'metadata_report' and 'link_analysis' in your JSON response.
 CRITICAL: You must format 'analysis', 'metadata_report', and 'link_analysis' with rich Markdown (e.g., bullet points, **bold text**, and \\n\\n for paragraph breaks) so they are visually appealing and easy to read in the UI.
-The "confidence" percentage must represent the overall Threat Rating severity (0-100%) based specifically on the metadata and links provided.
+CRITICAL MANDATORY RULE: The 'analysis' field MUST be a pure text string containing your Markdown analysis. It MUST NOT be a nested JSON object or dictionary containing parsed email fields! If you output a nested dictionary for the analysis, the UI will break.
+The "threat_score" percentage must represent the overall Danger / Threat severity (0-100%) based specifically on the metadata and links provided.
 """
         json_template = """{
   "is_threat": true,
-  "confidence": "85%",
+  "threat_score": 85,
   "indicators": ["Suspicious Return-Path", "Malicious Link"],
   "analysis": "**Point:** [Your main finding]\\n\\n**Evidence:** [The specific text/data that proves it]\\n\\n**Explanation:** [Why this matters]",
   "metadata_report": "- **Header Anomaly:** [Detail]\\n- **Routing Issue:** [Detail]",
@@ -103,17 +205,28 @@ The "confidence" percentage must represent the overall Threat Rating severity (0
     # which cuts off the end of the prompt (where the JSON instructions normally were).
     safe_text = text_to_analyze[:6000] + ("\n...[TRUNCATED]" if len(text_to_analyze) > 6000 else "")
 
+    voice_instructions = ""
+    if input_type == "Voice Mail":
+        voice_instructions = "CRITICAL VOICE ANALYSIS: This transcription contains timestamped audio segments. You MUST use the flow of conversation and these pauses to logically deduce ALL distinct speakers (e.g. telling Multiple Scammers, a 'Supervisor', or Bank Reps apart from the Victim) so you don't confuse who is demanding what.\n\n"
+
     system_prompt = f"""You are 'The Fraud Hunter', an elite cybersecurity AI.
 Your job is to analyze the user-submitted {input_type} message and determine if it is a phishing, vishing, or smishing scam.
 
-TASK:
-You must provide a strictly structured JSON response exactly matching this template. ONLY return valid JSON. Do not include markdown formatting like ```json.
+{vt_context}
+{urlscan_context}
+
+{examples_prompt}
+
+{voice_instructions}CRITICAL TASK:
+You MUST provide a strictly structured JSON response exactly matching this template. ONLY return valid JSON. Do not include markdown formatting like ```json.
+DO NOT CREATE YOUR OWN JSON KEYS. DO NOT USE ANY DIFFERENT SCHEMA. ONLY USE THE KEYS SHOWN IN THE TEMPLATE EXACTLY.
+
+TEMPLATE:
 {json_template}
 
 {email_instructions}
-{vt_context}
 
-{examples_prompt}
+{header_context}
 
 User Message text to analyze:
 \"\"\"
@@ -121,12 +234,30 @@ User Message text to analyze:
 \"\"\"
 """
 
+    # Use native JSON schema if supported by Ollama to force exact key adherence
+    schema = {
+        "type": "object",
+        "properties": {
+            "is_threat": {"type": "boolean"},
+            "threat_score": {"type": "integer", "description": "Danger severity from 0 to 100"},
+            "indicators": {"type": "array", "items": {"type": "string"}},
+            "analysis": {"type": "string"}
+        },
+        "required": ["is_threat", "threat_score", "indicators", "analysis"]
+    }
+    
+    if input_type == "Email":
+        schema["properties"]["metadata_report"] = {"type": "string"}
+        schema["properties"]["link_analysis"] = {"type": "string"}
+        schema["required"].extend(["metadata_report", "link_analysis"])
+
     payload = {
         "model": "llama3.2-vision" if image_b64 else MODEL_NAME,
         "prompt": system_prompt,
         "stream": False,
-        "format": "json"
+        "format": schema
     }
+    
     if image_b64:
         payload["images"] = [image_b64]
     
@@ -138,8 +269,25 @@ User Message text to analyze:
         # Attempt to parse Ollama's returned string as JSON
         try:
             parsed = json.loads(data['response'])
-            if isinstance(parsed, dict) and vt_report:
-                parsed['raw_vt_report'] = vt_report
+            if isinstance(parsed, dict):
+                # Handle cases where Llama 3 hallucinates nested JSON objects for text fields
+                for key in ['analysis', 'metadata_report', 'link_analysis']:
+                    if key in parsed and isinstance(parsed[key], dict):
+                        # Flatten the hallucinated dictionary into beautiful Markdown
+                        md_parts = []
+                        for k, v in parsed[key].items():
+                            clean_k = str(k).replace("_", " ").title()
+                            if isinstance(v, list):
+                                clean_v = ", ".join([str(x) for x in v])
+                            else:
+                                clean_v = str(v)
+                            md_parts.append(f"**{clean_k}:** {clean_v}")
+                        parsed[key] = "\n\n".join(md_parts)
+                    elif key in parsed and isinstance(parsed[key], list):
+                        parsed[key] = "\n\n".join([f"- {str(x)}" for x in parsed[key]])
+                
+                if vt_report: parsed['raw_vt_report'] = vt_report
+                if urlscan_report: parsed['raw_urlscan_report'] = urlscan_report
             return parsed
         except json.JSONDecodeError:
              return {

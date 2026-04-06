@@ -16,7 +16,8 @@ def transcribe_audio(audio_path):
         
         full_text = ""
         for segment in segments:
-            full_text += segment.text + " "
+            # Format: [0.0s - 3.5s]: Hello world
+            full_text += f"[{segment.start:.1f}s - {segment.end:.1f}s]: {segment.text.strip()}\n"
             
         return full_text.strip()
         

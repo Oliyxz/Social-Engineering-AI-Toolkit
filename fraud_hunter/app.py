@@ -5,7 +5,7 @@ import base64
 import io
 import tempfile
 
-from scanner import analyze_threat
+from scanner import analyze_threat, run_signature_scan, analyze_email_headers
 from audio_processor import transcribe_audio
 
 st.set_page_config(page_title="The Fraud Hunter", page_icon="🎣", layout="wide")
@@ -20,9 +20,11 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🛡️ Integrations")
 vt_key = st.sidebar.text_input("VirusTotal API Key (Optional)", type="password", help="Enter your free VirusTotal API key to enable link security scanning.")
 st.session_state.vt_api_key = vt_key
+urlscan_key = st.sidebar.text_input("URLScan.io API Key (Optional)", type="password", help="Enter your free URLScan.io API key for deep domain tracking.")
+st.session_state.urlscan_api_key = urlscan_key
 
 if vt_key:
-    if st.sidebar.button("Test API Key Connection", type="secondary"):
+    if st.sidebar.button("Test VirusTotal Key", type="secondary"):
         with st.sidebar.status("Communing with VirusTotal...", expanded=False) as status:
             import requests
             headers = {"x-apikey": vt_key}
@@ -34,6 +36,22 @@ if vt_key:
             elif test_resp.status_code == 401:
                 status.update(label="API Key Invalid", state="error", expanded=True)
                 st.sidebar.error("❌ Unauthorized: Invalid or missing privileges for this API Key.")
+            else:
+                status.update(label="Connection Error", state="error", expanded=True)
+                st.sidebar.error(f"⚠️ Server returned HTTP {test_resp.status_code}")
+
+if urlscan_key:
+    if st.sidebar.button("Test URLScan Key", type="secondary"):
+        with st.sidebar.status("Communing with URLScan.io...", expanded=False) as status:
+            import requests
+            headers = {"API-Key": urlscan_key}
+            test_resp = requests.get("https://urlscan.io/api/v1/search/?q=domain:google.com", headers=headers, timeout=5)
+            if test_resp.status_code == 200:
+                status.update(label="API Key Validated!", state="complete", expanded=False)
+                st.sidebar.success("✅ Your URLScan.io API key is active and ready.")
+            elif test_resp.status_code in [400, 401, 403]:
+                status.update(label="API Key Invalid", state="error", expanded=True)
+                st.sidebar.error("❌ Unauthorized: Invalid API Key.")
             else:
                 status.update(label="Connection Error", state="error", expanded=True)
                 st.sidebar.error(f"⚠️ Server returned HTTP {test_resp.status_code}")
@@ -58,12 +76,10 @@ def load_local_json(filename):
 sms_dataset = load_local_json('sms_dataset.json')
 email_dataset = load_local_json('email_dataset.json')
 url_dataset = load_local_json('url_dataset.json')
-voice_dataset = load_local_json('voice_dataset.json')
 
 st.sidebar.markdown(f"📱 SMS: **{len(sms_dataset) if sms_dataset else 0} references**")
 st.sidebar.markdown(f"📧 Email: **{len(email_dataset) if email_dataset else 0} references**")
 st.sidebar.markdown(f"🔗 URL: **{len(url_dataset) if url_dataset else 0} references**")
-st.sidebar.markdown(f"🎙️ Voice: **{len(voice_dataset) if voice_dataset else 0} references**")
 st.sidebar.markdown("*Defaults to `phishing_knowledge_base.json` if empty.*")
 
 tab1, tab2 = st.tabs(["💬 Text & Link Scanner", "🎙️ Voice Mail Scanner"])
@@ -87,6 +103,12 @@ with tab1:
         if not text_input.strip() and not img_b64:
             st.warning("Please enter some text or upload a screenshot to scan.")
         else:
+            header_result = None
+            if input_type == "Email" and text_input.strip():
+                header_result = analyze_email_headers(text_input)
+                        
+            sig_matches = run_signature_scan(text_input)
+                    
             with st.spinner(f"Analyzing {input_type} against threat datasets..."):
                 # Dynamically select the correct specialized dataset
                 active_dataset = None
@@ -95,20 +117,41 @@ with tab1:
                 elif input_type == "URL": active_dataset = url_dataset
                 
                 vt_key = st.session_state.get("vt_api_key", "")
-                result = analyze_threat(text_input, input_type, custom_dataset=active_dataset, image_b64=img_b64, vt_api_key=vt_key)
+                urlscan_key = st.session_state.get("urlscan_api_key", "")
+                result = analyze_threat(text_input, input_type, custom_dataset=active_dataset, image_b64=img_b64, vt_api_key=vt_key, urlscan_api_key=urlscan_key, header_analysis_result=header_result)
                 
             if "error" in result:
                 st.error(result["error"])
             else:
-                conf = result.get('confidence', 'Unknown')
+                conf_val = result.get('threat_score', 0)
+                if isinstance(conf_val, str):
+                    conf_val = int(conf_val.replace('%', '')) if '%' in conf_val and conf_val.replace('%', '').isdigit() else (100 if result.get("is_threat") else 0)
+                
+                conf_str = f"{conf_val}%"
+                
                 if result.get("is_threat"):
-                    st.error(f"🚨 **THREAT DETECTED** (Threat Rating: {conf})")
+                    st.error(f"🚨 **THREAT DETECTED** (Threat Rating: {conf_str})")
                     if input_type == "Email":
-                        st.progress(int(conf.replace('%', '')) if isinstance(conf, str) and '%' in conf and conf.replace('%', '').isdigit() else 100)
+                        st.progress(conf_val)
                 else:
-                    st.success(f"✅ **APPEARS SAFE** (Threat Rating: {conf})")
+                    st.success(f"✅ **APPEARS SAFE** (Threat Rating: {conf_str})")
                     if input_type == "Email":
-                        st.progress(int(conf.replace('%', '')) if isinstance(conf, str) and '%' in conf and conf.replace('%', '').isdigit() else 0)
+                        st.progress(conf_val)
+                        
+                # Ensure the Pre-Scans are displayed neatly with the final report
+                if input_type == "Email" and header_result:
+                    st.markdown("### 🔐 Cryptographic Header Scan")
+                    if header_result.get("is_authenticated"):
+                        st.success(f"✅ **SENDER AUTHENTICATED:** Cryptographic signatures (SPF/DKIM) match the domain owner for `{header_result.get('auth_domain')}`.")
+                    if header_result.get("is_forged"):
+                        st.error("🚨 **CRYPTOGRAPHIC SPOOFING DETECTED** 🚨")
+                        for hr in header_result.get("report", []):
+                            st.error(hr)
+                            
+                if sig_matches:
+                    st.error("🚨 **YARA-LITE SIGNATURE MATCHES FOUND** - The system instantly identified known malicious structures:")
+                    for match in sig_matches:
+                        st.markdown(f"- **{match['name']}** (Severity: {match['severity']}): {match['description']}")
                     
                 st.markdown("### Threat Indicators Found:")
                 indicators = result.get("indicators", [])
@@ -121,6 +164,10 @@ with tab1:
                 if result.get("raw_vt_report"):
                     st.markdown("### 🛡️ VirusTotal Raw Data:")
                     st.code(result.get("raw_vt_report"))
+                    
+                if result.get("raw_urlscan_report"):
+                    st.markdown("### 🛡️ URLScan.io Raw Data:")
+                    st.code(result.get("raw_urlscan_report"))
                     
                 if input_type == "Email" and result.get("metadata_report"):
                     st.markdown("### 📧 Extensive Metadata Report:")
@@ -141,6 +188,7 @@ with tab1:
 with tab2:
     st.subheader("Voicemail Threat Analysis")
     st.markdown("Upload a suspicious `.wav` or `.mp3` voicemail. The system will transcribe the audio locally and analyze it for **Vishing** (Voice Phishing) attacks.")
+    st.caption("*(Need an audio file to test? Check the `samples/` folder in the project directory!)*")
     
     uploaded_file = st.file_uploader("Upload Voicemail", type=['wav', 'mp3', 'm4a', 'flac'])
     
@@ -168,15 +216,16 @@ with tab2:
                 
                 with st.spinner("Analyzing transcription against threat databases..."):
                     vt_key = st.session_state.get("vt_api_key", "")
-                    result = analyze_threat(transcription, "Voice Mail", custom_dataset=voice_dataset, vt_api_key=vt_key)
+                    result = analyze_threat(transcription, "Voice Mail", custom_dataset=None, vt_api_key=vt_key)
                     
                 if "error" in result:
                     st.error(result["error"])
                 else:
+                    threat_score = result.get('threat_score', 0)
                     if result.get("is_threat"):
-                        st.error(f"🚨 **VOICE THREAT DETECTED** (Confidence: {result.get('confidence', 'Unknown')})")
+                        st.error(f"🚨 **VOICE THREAT DETECTED** (Threat Rating: {threat_score}%)")
                     else:
-                        st.success(f"✅ **NO THREAT DETECTED** (Confidence: {result.get('confidence', 'Unknown')})")
+                        st.success(f"✅ **NO THREAT DETECTED** (Threat Rating: {threat_score}%)")
                         
                     st.markdown("### Threat Indicators Found:")
                     indicators = result.get("indicators", [])

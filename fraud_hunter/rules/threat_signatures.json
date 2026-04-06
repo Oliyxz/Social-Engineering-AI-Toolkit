@@ -1,0 +1,37 @@
+[
+  {
+    "rule_id": "URG_001",
+    "name": "High Urgency Action",
+    "severity": "High",
+    "pattern": "(?i)\\b(immediate action required|account suspended|verify your account now|last warning|final notice)\\b",
+    "description": "Scammers force urgency to make you panic and click links without thinking."
+  },
+  {
+    "rule_id": "FIN_002",
+    "name": "Suspicious Crypto Request",
+    "severity": "Critical",
+    "pattern": "(?i)\\b(bitcoin|wallet address|btc|crypto|ethereum)\\b.*?\\b(transfer|pay|send|fund)\\b",
+    "description": "Legitimate organizations rarely request payment natively in cryptocurrency via email."
+  },
+  {
+    "rule_id": "HMG_003",
+    "name": "Homoglyph/Typosquatting Domains",
+    "severity": "Critical",
+    "pattern": "(?i)(paypa[1I]\\.com|amzn\\.com|microsoft-support|app[1I]e\\.com|secur[ei]bank)",
+    "description": "Known fake domain string designed to visually trick readers."
+  },
+  {
+    "rule_id": "ATT_004",
+    "name": "Dangerous Direct Attachment",
+    "severity": "High",
+    "pattern": "(?i)\\b(attached|invoice|receipt)\\b.*?\\.(exe|scr|vbs|bat|js|wsf)\\b",
+    "description": "Executable attachments are the #1 delivery method for malware."
+  },
+  {
+    "rule_id": "MFA_005",
+    "name": "OTP / MFA Skimming",
+    "severity": "Critical",
+    "pattern": "(?i)\\b(one-?time pass(code|word)?|otp|2fa|code)\\b.*?\\b(share|give|reply with|send)\\b",
+    "description": "No legitimate service will ever ask you to reply with your multi-factor code."
+  }
+]
